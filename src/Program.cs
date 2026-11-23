@@ -9,8 +9,8 @@ using System.Windows.Forms;
 [assembly: AssemblyTitle("Мост диагностики RDP")]
 [assembly: AssemblyDescription("Агент диагностики удаленного компьютера через RDP и MCP-сервер для Claude")]
 [assembly: AssemblyProduct("RdpDiagBridge")]
-[assembly: AssemblyVersion("1.0.1.0")]
-[assembly: AssemblyFileVersion("1.0.1.0")]
+[assembly: AssemblyVersion("1.0.2.0")]
+[assembly: AssemblyFileVersion("1.0.2.0")]
 
 namespace RdpDiagBridge;
 

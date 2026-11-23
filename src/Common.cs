@@ -16,7 +16,7 @@ namespace RdpDiagBridge;
 public static class Proto
 {
     public const int Version = 1;
-    public const string AppVersion = "1.0.1";
+    public const string AppVersion = "1.0.2";
     public const string ExeName = "RdpDiagBridge.exe";
     // 10.11.2026 Каталог обмена на компьютере с Claude; из RDP-сеанса он виден как \\tsclient\C\RdpDiagBridge.
     public const string DefaultRoot = @"C:\RdpDiagBridge";

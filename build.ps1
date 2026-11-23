@@ -16,8 +16,12 @@ New-Item -ItemType Directory -Force $bin | Out-Null
 $out = Join-Path $bin 'RdpDiagBridge.exe'
 $new = Join-Path $bin 'RdpDiagBridge.new.exe'
 $sources = Get-ChildItem (Join-Path $root 'src') -Filter *.cs | ForEach-Object { $_.FullName }
+# 23.11.2026 Значок файла и окна (res\app.ico, рисуется res\make-icon.ps1) и манифест (тема Windows, масштаб экрана).
+$icon = Join-Path $root 'res\app.ico'
+$manifest = Join-Path $root 'res\app.manifest'
 $arguments = @($csc, '-nologo', '-noconfig', '-nostdlib+', '-target:winexe', '-platform:anycpu', '-optimize+',
-    '-langversion:10', '-utf8output', '-warn:4', '-nowarn:1701,1702', "-out:$new") + $refs + $sources
+    '-langversion:10', '-utf8output', '-warn:4', '-nowarn:1701,1702', "-win32icon:$icon", "-win32manifest:$manifest",
+    "-resource:$icon,app.ico", "-out:$new") + $refs + $sources
 & dotnet @arguments
 if ($LASTEXITCODE -ne 0) { throw "Компиляция завершилась с кодом $LASTEXITCODE" }
 if (Test-Path $out) {

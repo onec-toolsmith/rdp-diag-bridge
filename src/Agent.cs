@@ -76,6 +76,18 @@ public sealed class DiagContext
     }
 }
 
+// 23.11.2026 Запись журнала для окна агента. У команды одна строка на все ее состояния: окно находит строку по
+// CommandId и обновляет ее. Status: info, waiting, running, ok, error, rejected, denied, cancelled, expired.
+public sealed class LogEntry
+{
+    public DateTime Time = DateTime.Now;
+    public string CommandId = "";
+    public string Command = "";
+    public string Status = "info";
+    public string Text = "";
+    public double Seconds = -1;
+}
+
 // 10.11.2026 Агент на удаленном компьютере: опрашивает каталог сеанса, выполняет команды в отдельном потоке,
 // пишет ответы и сердцебиение. Окно агента (AgentForm) только показывает состояние и передает решения пользователя.
 public sealed class AgentCore
@@ -90,7 +102,7 @@ public sealed class AgentCore
     public volatile string LastError = "";
     public int CommandsDone;
     public readonly DateTime StartedUtc = DateTime.UtcNow;
-    public readonly ConcurrentQueue<string> LogQueue = new ConcurrentQueue<string>();
+    public readonly ConcurrentQueue<LogEntry> LogQueue = new ConcurrentQueue<LogEntry>();
     public volatile bool StopRequested;
 
     readonly object sync = new object();
@@ -157,9 +169,21 @@ public sealed class AgentCore
 
     public void Log(string text)
     {
-        LogQueue.Enqueue(DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture) + "  " + text);
+        Write(new LogEntry { Text = text });
+    }
+
+    void LogCommand(Command command, string status, string text, double seconds = -1)
+    {
+        Write(new LogEntry { CommandId = command.Id, Command = command.Type, Status = status, Text = text, Seconds = seconds });
+    }
+
+    // 23.11.2026 Без окна очередь никто не читает – туда не пишем.
+    void Write(LogEntry entry)
+    {
         if (Headless)
-            Trace.WriteLine(text);
+            Trace.WriteLine((entry.Command != "" ? entry.Command + ": " : "") + entry.Text);
+        else
+            LogQueue.Enqueue(entry);
     }
 
     public void Start(string root)
@@ -387,7 +411,7 @@ public sealed class AgentCore
             pending = command;
             decided = false;
             stateChanged = true;
-            Log("Запрос " + command.Type + " ждет решения");
+            LogCommand(command, "waiting", "ждет вашего решения");
             return true;
         }
         StartBusy(command);
@@ -399,7 +423,7 @@ public sealed class AgentCore
         busy = command;
         cancelFromUi = false;
         stateChanged = true;
-        Log("Выполняется " + command.Type);
+        LogCommand(command, "running", "выполняется");
         var thread = new Thread(() =>
         {
             string text;
@@ -446,7 +470,6 @@ public sealed class AgentCore
         pending = null;
         if (decisionAllow)
         {
-            Log("Разрешено: " + command.Type);
             StartBusy(command);
             if (decisionComment.Trim() != "")
                 command.Context.Warn("Комментарий пользователя: " + decisionComment.Trim());
@@ -481,14 +504,21 @@ public sealed class AgentCore
         CommandsDone++;
         stateChanged = true;
         var status = "ok";
+        var error = "";
         try
         {
-            status = Json.ParseObject(text).Str("status", "ok");
+            var parsed = Json.ParseObject(text);
+            status = parsed.Str("status", "ok");
+            error = parsed.Str("error");
         }
         catch (Exception)
         {
         }
-        Log(command.Type + ": " + StatusName(status) + ", " + Txt.Num(Math.Max(0, (DateTime.UtcNow - command.ReceivedUtc).TotalSeconds)) + " с");
+        // 23.11.2026 У ошибки в журнале виден ее текст; у отказов и прерываний хватает названия состояния.
+        var line = StatusName(status);
+        if (status == "error" && error != "")
+            line += ": " + error.Replace("\r", " ").Replace("\n", " ");
+        LogCommand(command, status, line, Math.Max(0, (DateTime.UtcNow - command.ReceivedUtc).TotalSeconds));
     }
 
     static string StatusName(string status)
